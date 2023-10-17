@@ -6,7 +6,7 @@ def main():
     # Checking that the correct number of arguments was passed in
     if len(sys.argv) != 4:
         print("Invalid number of arguments")
-        print("Program should be run in form 'python ./CountMin.py input_file num_counter_arrays num_counter_per_array'")
+        print("Program should be run in form 'python ./Counter_Sketch.py input_file num_counter_arrays num_counter_per_array'")
         return
     
     # Setting input parameters
@@ -43,7 +43,10 @@ def main():
 
     # Recording flows into counter arrays
     record_flows(flows, hashes, counter_arrays)
-
+    
+    #for array in counter_arrays:
+    #    print(array.count(0))
+    
     # Estimated size of each flow and calculating error
     flows_estimated_counts, flows_errors =  query_flows(flows, hashes, counter_arrays)
 
@@ -72,6 +75,8 @@ def main():
 # Returns: None
 # Description: Records a list of flows into a counter array structure. Records to one spot in each counter array
 def record_flows(flows, hashes, counter_arrays):
+    minus = 0
+    plus = 0
     # Recording each flow
     for flow in flows:
         # Creating one int form of flow id to hash
@@ -83,7 +88,17 @@ def record_flows(flows, hashes, counter_arrays):
 
         # Recording in each counter array
         for counter_num in range(len(counter_arrays)):
-            counter_arrays[counter_num][flow_hashed_ids[counter_num]] += int(flow[1])
+            # If last bit in hashed key is 1, add the count
+            if int(bin(flow_hashed_ids[counter_num])[-1]) == 1:
+                plus += 1
+                counter_arrays[counter_num][flow_hashed_ids[counter_num]] += int(flow[1])
+            # If last bit in hashed key is 0, subtract the count
+            else:
+                minus += 1
+                counter_arrays[counter_num][flow_hashed_ids[counter_num]] -= int(flow[1])
+
+    print(plus)
+    print(minus)
 # record_flows()
 
 
@@ -107,14 +122,19 @@ def query_flows(flows, hashes, counter_arrays):
         # Obtaining the count in each counter array
         counts_found = []
         for counter_num in range(len(counter_arrays)):
-            counts_found.append(counter_arrays[counter_num][flow_hashed_ids[counter_num]])
-        
+            if int(bin(flow_hashed_ids[counter_num])[-1]) == 1:
+                counts_found.append(counter_arrays[counter_num][flow_hashed_ids[counter_num]])
+            else:
+                counts_found.append(0-counter_arrays[counter_num][flow_hashed_ids[counter_num]])
+
         # Sorting the found counts by size
         counts_found.sort()
+        #print(counts_found)
 
-        # Estimated count is the minimum found
-        estimated_count = counts_found[0]
-        estimated_error = abs(estimated_count - flow[-1])
+        # Estimated count is the median count found
+        estimated_count = (counts_found[int(len(counts_found)/2)])
+        estimated_error = abs(estimated_count - flow[1])
+        #print(flow[1])
 
         # Recording count and error for this flow
         flows_estimated_counts.append(estimated_count)
@@ -143,6 +163,7 @@ def hash_function(flow_id, num_counter_in_array, hashes):
         # Error if id isn't more than six digits long; correcting here
         if current_id < 1000000:
             current_id += 1000000
+        #split_id_sum = int(str(current_id)[:4]) + int(str(current_id)[4:8]) + int(str(current_id)[8:]) # print
         split_id_sum = int(str(current_id)[:6]) + int(str(current_id)[6:])
         flow_hash_counters.append(split_id_sum % num_counter_in_array)
 
