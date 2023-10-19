@@ -74,12 +74,8 @@ def main():
 def record_flows(flows, hashes, counter_arrays):
     # Recording each flow
     for flow in flows:
-        # Creating one int form of flow id to hash
-        id_parts = str(flow[0]).split('.')
-        flow_id_to_hash = int(id_parts[0] + id_parts[1] + id_parts[2] + id_parts[3])
-
         # Getting hashed counter locations in each array
-        flow_hashed_ids = hash_function(flow_id_to_hash, len(counter_arrays[0]), hashes)
+        flow_hashed_ids = hash_function(flow, len(counter_arrays[0]), hashes)
 
         # Recording in each counter array
         for counter_num in range(len(counter_arrays)):
@@ -96,13 +92,8 @@ def query_flows(flows, hashes, counter_arrays):
     
     # Querying each flow
     for flow in flows:
-
-        # Creating one int form of flow id to hash
-        id_parts = str(flow[0]).split('.')
-        flow_id_to_hash = int(id_parts[0] + id_parts[1] + id_parts[2] + id_parts[3])
-
         # Getting hashed counter locations in each array
-        flow_hashed_ids = hash_function(flow_id_to_hash, len(counter_arrays[0]), hashes)
+        flow_hashed_ids = hash_function(flow, len(counter_arrays[0]), hashes)
         
         # Obtaining the count in each counter array
         counts_found = []
@@ -130,11 +121,15 @@ def query_flows(flows, hashes, counter_arrays):
 #   Split number into two (first six digits, and then rest of number)
 #       Flow id can be between 4 to 12 digits
 #   Add two parts and then do num % num_counter_in_array
-def hash_function(flow_id, num_counter_in_array, hashes):
+def hash_function(flow_id, num_counter_in_array, hashes):   
+    # Creating one int form of  flow id to hash
+    id_parts = str(flow_id[0]).split('.')
+    flow_id_to_hash = int(id_parts[0] + id_parts[1] + id_parts[2] + id_parts[3])
+
     # Obtaining hash ids
     multi_hashing_flow_ids = []
     for hash in hashes:
-        multi_hashing_flow_ids.append(flow_id^hash)
+        multi_hashing_flow_ids.append(flow_id_to_hash^hash)
     
     # Obtaining counter positions flow hashes to
     flow_hash_counters = []

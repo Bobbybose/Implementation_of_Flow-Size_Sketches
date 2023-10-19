@@ -44,9 +44,6 @@ def main():
     # Recording flows into counter arrays
     record_flows(flows, hashes, counter_arrays)
     
-    #for array in counter_arrays:
-    #    print(array.count(0))
-    
     # Estimated size of each flow and calculating error
     flows_estimated_counts, flows_errors =  query_flows(flows, hashes, counter_arrays)
 
@@ -75,30 +72,21 @@ def main():
 # Returns: None
 # Description: Records a list of flows into a counter array structure. Records to one spot in each counter array
 def record_flows(flows, hashes, counter_arrays):
-    minus = 0
-    plus = 0
     # Recording each flow
     for flow in flows:
-        # Creating one int form of flow id to hash
-        id_parts = str(flow[0]).split('.')
-        flow_id_to_hash = int(id_parts[0] + id_parts[1] + id_parts[2] + id_parts[3])
-
         # Getting hashed counter locations in each array
-        flow_hashed_ids = hash_function(flow_id_to_hash, len(counter_arrays[0]), hashes)
+        flow_hashed_ids = hash_function(flow, hashes, 6)
+        binary_hashes = hash_function(flow, hashes, 4)
 
         # Recording in each counter array
         for counter_num in range(len(counter_arrays)):
             # If last bit in hashed key is 1, add the count
-            if int(bin(flow_hashed_ids[counter_num])[-1]) == 1:
-                plus += 1
-                counter_arrays[counter_num][flow_hashed_ids[counter_num]] += int(flow[1])
+            #if int(bin(flow_hashed_ids[counter_num])[-1]) == 1:
+            if int(bin(binary_hashes[counter_num])[-1]) == 1:
+                counter_arrays[counter_num][flow_hashed_ids[counter_num] % len(counter_arrays[0])] += int(flow[1])
             # If last bit in hashed key is 0, subtract the count
             else:
-                minus += 1
-                counter_arrays[counter_num][flow_hashed_ids[counter_num]] -= int(flow[1])
-
-    print(plus)
-    print(minus)
+                counter_arrays[counter_num][flow_hashed_ids[counter_num]  % len(counter_arrays[0])] -= int(flow[1])
 # record_flows()
 
 
@@ -111,30 +99,26 @@ def query_flows(flows, hashes, counter_arrays):
     
     # Querying each flow
     for flow in flows:
-
-        # Creating one int form of flow id to hash
-        id_parts = str(flow[0]).split('.')
-        flow_id_to_hash = int(id_parts[0] + id_parts[1] + id_parts[2] + id_parts[3])
-
         # Getting hashed counter locations in each array
-        flow_hashed_ids = hash_function(flow_id_to_hash, len(counter_arrays[0]), hashes)
-        
+        flow_hashed_ids = hash_function(flow, hashes, 6)
+        # Getting binary hash value to check
+        binary_hashes = hash_function(flow, hashes, 4)
+
         # Obtaining the count in each counter array
         counts_found = []
         for counter_num in range(len(counter_arrays)):
-            if int(bin(flow_hashed_ids[counter_num])[-1]) == 1:
-                counts_found.append(counter_arrays[counter_num][flow_hashed_ids[counter_num]])
+            #if int(bin(flow_hashed_ids[counter_num])[-1]) == 1:
+            if int(bin(binary_hashes[counter_num])[-1]) == 1:
+                counts_found.append(counter_arrays[counter_num][flow_hashed_ids[counter_num] % len(counter_arrays[0])])
             else:
-                counts_found.append(0-counter_arrays[counter_num][flow_hashed_ids[counter_num]])
+                counts_found.append(0-counter_arrays[counter_num][flow_hashed_ids[counter_num] % len(counter_arrays[0])])
 
         # Sorting the found counts by size
         counts_found.sort()
-        #print(counts_found)
 
         # Estimated count is the median count found
         estimated_count = (counts_found[int(len(counts_found)/2)])
         estimated_error = abs(estimated_count - flow[1])
-        #print(flow[1])
 
         # Recording count and error for this flow
         flows_estimated_counts.append(estimated_count)
@@ -144,28 +128,45 @@ def query_flows(flows, hashes, counter_arrays):
 # query_flows()
 
 
-# Inputs: Id of flow to hash, number of counters in the counter array, hashes to use for multi-hashing
+# Inputs: Id of flow to hash, hashes to use for multi-hashing, what size parts to split id into
 # Returns: Index in each counter where flow should be recorded to
 # Description: Folding hash function implementation based from https://www.herevego.com/hashing-python/
-#   Split number into two (first six digits, and then rest of number)
-#       Flow id can be between 4 to 12 digits
-#   Add two parts and then do num % num_counter_in_array
-def hash_function(flow_id, num_counter_in_array, hashes):
+#   Split id into a number of parts based on given step size and then add them together
+#   Hash function changes depending on step size
+def hash_function(flow_id, hashes, step_size):
+    # Creating one int form of  flow id to hash
+    id_parts = str(flow_id[0]).split('.')
+    flow_id_to_hash = int(id_parts[0] + id_parts[1] + id_parts[2] + id_parts[3])
+    
     # Obtaining hash ids
     multi_hashing_flow_ids = []
     for hash in hashes:
-        multi_hashing_flow_ids.append(flow_id^hash)
+        multi_hashing_flow_ids.append(flow_id_to_hash^hash)
     
     # Obtaining counter positions flow hashes to
     flow_hash_counters = []
     for current_id in multi_hashing_flow_ids:
+        # If id is too short than error will occur; fixing here
+        if current_id < 10**(step_size):
+            current_id += 10**(step_size)
 
-        # Error if id isn't more than six digits long; correcting here
-        if current_id < 1000000:
-            current_id += 1000000
-        #split_id_sum = int(str(current_id)[:4]) + int(str(current_id)[4:8]) + int(str(current_id)[8:]) # print
-        split_id_sum = int(str(current_id)[:6]) + int(str(current_id)[6:])
-        flow_hash_counters.append(split_id_sum % num_counter_in_array)
+        # Pointer to current position of number
+        int_pos = 0
+        # Total sum of the split id
+        split_id_sum = 0
+        # Creating parts until there's no number left
+        while int_pos < len(str(current_id)):
+            # Making sure index isn't out of bounds
+            if int_pos + step_size < len(str(current_id)):
+                split_id_part = str(current_id)[int_pos:int_pos + step_size]
+            else:
+                split_id_part = str(current_id)[int_pos:]
+            
+            # Incrementing number position pointer
+            int_pos = int_pos + step_size
+            split_id_sum += int(split_id_part)
+
+        flow_hash_counters.append(split_id_sum)
 
     return flow_hash_counters
 # hash_function()
